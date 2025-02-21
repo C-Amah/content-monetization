@@ -34,3 +34,14 @@
     )
 )
 
+;; Check if a user has an active subscription
+(define-read-only (has-active-subscription (subscriber principal) (creator principal))
+    (let (
+        (subscription (unwrap! (map-get? subscriptions { subscriber: subscriber }) ERR_SUBSCRIPTION_NOT_FOUND))
+        (expiry (get expiry subscription))
+    )
+    (ok (> expiry stacks-block-height))
+    )
+)
+
+
