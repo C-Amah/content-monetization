@@ -8,6 +8,10 @@
 (define-constant ERR_SUBSCRIPTION_NOT_FOUND (err u103))
 (define-constant ERR_CONTENT_NOT_FOUND (err u104))
 
+(define-constant ERR_INSUFFICIENT_BALANCE (err u105))
+(define-constant ERR_TRANSFER_FAILED (err u106))
+(define-constant ERR_INVALID_ROYALTY (err u107))
+
 
 ;; Data maps and variables
 (define-map subscriptions { subscriber: principal } { creator: principal, expiry: uint })
@@ -44,4 +48,26 @@
     )
 )
 
+;; Get the royalty balance for a creator
+(define-read-only (get-royalty-balance (creator principal))
+    (ok (default-to u0 (get balance (map-get? royalties { creator: creator }))))
+)
 
+;; Extend subscription
+(define-public (extend-subscription (subscriber principal) (creator principal) (duration uint))
+    (begin
+        ;; Ensure the caller is the contract owner or the subscriber
+        (asserts! (or (is-eq tx-sender contract-owner) (is-eq tx-sender subscriber)) ERR_NOT_AUTHORIZED)
+
+        ;; Get the current subscription
+        (let (
+            (subscription (unwrap! (map-get? subscriptions { subscriber: subscriber }) ERR_SUBSCRIPTION_NOT_FOUND))
+            (current-expiry (get expiry subscription))
+        )
+        ;; Update the subscription expiry
+        (map-set subscriptions { subscriber: subscriber } { creator: creator, expiry: (+ current-expiry duration) })
+
+        (ok true)
+    )
+)
+)
