@@ -71,3 +71,12 @@
     )
 )
 )
+
+;; Get content details
+(define-read-only (get-content-details (content-id uint))
+    (ok (map-get? content { content-id: content-id }))
+)
+
+
+
+
