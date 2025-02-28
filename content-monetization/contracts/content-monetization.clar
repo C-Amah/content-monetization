@@ -77,7 +77,7 @@
     (ok (map-get? content { content-id: content-id }))
 )
 
-;; NEW FEATURE: Withdraw royalties for creators
+;; Withdraw royalties for creators
 (define-public (withdraw-royalties)
     (let (
         (creator-royalty (unwrap! (map-get? royalties { creator: tx-sender }) ERR_INSUFFICIENT_BALANCE))
@@ -94,7 +94,7 @@
     )
 )
 
-;; NEW FEATURE: Create premium content with access control
+;; Create premium content with access control
 (define-map premium-content-access { content-id: uint, user: principal } { access: bool })
 
 (define-public (create-premium-content (content-id uint) (price uint) (royalty-percentage uint))
@@ -114,4 +114,56 @@
 )
 
 
+;; NEW FEATURE: Purchase access to premium content
+(define-public (purchase-content-access (content-id uint))
+    (let (
+        (content-details (unwrap! (map-get? content { content-id: content-id }) ERR_CONTENT_NOT_FOUND))
+        (creator (get creator content-details))
+        (price (get price content-details))
+        (royalty-percentage (get royalty-percentage content-details))
+    )
+        ;; Transfer payment from user to contract
+        (try! (stx-transfer? price tx-sender (as-contract tx-sender)))
+        
+        ;; Calculate creator royalty
+        (let (
+            (creator-royalty (/ (* price royalty-percentage) u100))
+            (current-royalty (default-to { balance: u0 } (map-get? royalties { creator: creator })))
+            (new-balance (+ (get balance current-royalty) creator-royalty))
+        )
+            ;; Update creator royalty balance
+            (map-set royalties { creator: creator } { balance: new-balance })
+            
+            ;; Grant access to content
+            (map-set premium-content-access { content-id: content-id, user: tx-sender } { access: true })
+            
+            (ok true)
+        )
+    )
+)
+
+
+;; NEW FEATURE: Check if user has access to premium content
+(define-read-only (has-premium-access (content-id uint) (user principal))
+    (ok (is-some (map-get? premium-content-access { content-id: content-id, user: user })))
+)
+
+;; NEW FEATURE: Transfer content ownership
+(define-public (transfer-content-ownership (content-id uint) (new-owner principal))
+    (let (
+        (content-details (unwrap! (map-get? content { content-id: content-id }) ERR_CONTENT_NOT_FOUND))
+        (creator (get creator content-details))
+    )
+        ;; Ensure the caller is the content creator
+        (asserts! (is-eq tx-sender creator) ERR_NOT_AUTHORIZED)
+        
+        ;; Update content ownership
+        (map-set content { content-id: content-id } 
+                 { creator: new-owner, 
+                   price: (get price content-details), 
+                   royalty-percentage: (get royalty-percentage content-details) })
+        
+        (ok true)
+    )
+)
 
