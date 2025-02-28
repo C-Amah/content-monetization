@@ -77,6 +77,41 @@
     (ok (map-get? content { content-id: content-id }))
 )
 
+;; NEW FEATURE: Withdraw royalties for creators
+(define-public (withdraw-royalties)
+    (let (
+        (creator-royalty (unwrap! (map-get? royalties { creator: tx-sender }) ERR_INSUFFICIENT_BALANCE))
+        (balance (get balance creator-royalty))
+    )
+        ;; Ensure creator has royalties to withdraw
+        (asserts! (> balance u0) ERR_INSUFFICIENT_BALANCE)
+        
+        ;; Reset creator balance
+        (map-set royalties { creator: tx-sender } { balance: u0 })
+        
+        ;; Transfer royalties to creator
+        (as-contract (stx-transfer? balance tx-sender tx-sender))
+    )
+)
+
+;; NEW FEATURE: Create premium content with access control
+(define-map premium-content-access { content-id: uint, user: principal } { access: bool })
+
+(define-public (create-premium-content (content-id uint) (price uint) (royalty-percentage uint))
+    (begin
+        ;; Ensure royalty percentage is reasonable (1-50%)
+        (asserts! (and (> royalty-percentage u0) (<= royalty-percentage u50)) ERR_INVALID_ROYALTY)
+        
+        ;; Ensure the content ID does not already exist
+        (asserts! (is-none (map-get? content { content-id: content-id })) ERR_CONTENT_NOT_FOUND)
+        
+        ;; Create premium content entry
+        (map-set content { content-id: content-id } 
+                 { creator: tx-sender, price: price, royalty-percentage: royalty-percentage })
+        
+        (ok true)
+    )
+)
 
 
 
